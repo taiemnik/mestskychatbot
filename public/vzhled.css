@@ -1,0 +1,17 @@
+/* Vzniká z chatbot.toml příkazem `python tasks.py build` – neupravujte ručně. */
+:root {
+  --c-navy: #1d4f91;
+  --c-blue: #839ec2;
+  --c-sky: #dde5ee;
+  --accent-hover: #3f69a2;
+  --accent-text: #ffffff;
+  --bubble: #dfe6f0;
+  --bubble-text: #112f57;
+  --sky-soft: #edf1f6;
+  --mark-bg: #e4eaf2;
+  --focus: rgba(131, 158, 194, .35);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-rezim="svetly"]) { --accent: #a5b9d3; --accent-hover: #c0cee0; --accent-text: #0b1826; --bubble: #16355e; --sky-soft: #122844; --mark-bg: #153258; --focus: rgba(165, 185, 211, .35); }
+}
+:root[data-rezim="tmavy"] { --accent: #a5b9d3; --accent-hover: #c0cee0; --accent-text: #0b1826; --bubble: #16355e; --sky-soft: #122844; --mark-bg: #153258; --focus: rgba(165, 185, 211, .35); }

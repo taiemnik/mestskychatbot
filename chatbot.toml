@@ -1,0 +1,29 @@
+# Nastavení chatbota – čí je a jak se představuje. Žádná tajemství sem nepatří (klíč a heslo jsou v .env).
+# Po každé změně spusťte:  python tasks.py build
+
+[chatbot]
+nazev = "Městský chatbot"
+organizace = ""                 # například "Město Horní Áíčkov" – objeví se pod názvem
+# Jedna až dvě věty: z čeho chatbot odpovídá. Jsou na úvodní stránce.
+popis = "Odpovídám z obecně závazných vyhlášek a nařízení města a u každé odpovědi ukážu, kde přesně to v předpisu stojí."
+upozorneni = "Odpověď může obsahovat chyby. Závazné je vždy znění předpisu."
+kontakt = ""                    # kam se obrátit, když chatbot odpověď nezná (web, e-mail nebo telefon úřadu)
+odkaz = ""                      # adresa, kde jsou předpisy zveřejněné, například stránka obce ve Sbírce právních předpisů
+# Odkaz „Chcete takového chatbota?“ v postranním panelu. Smažte hodnotu, pokud ho na stránce nechcete.
+navod = "https://github.com/taiemnik/mestskychatbot"
+
+[vzhled]
+barva = "#1d4f91"               # hlavní barva stránky (tlačítka, logo); ostatní odstíny se dopočítají
+
+[otazky]
+# Návrhy otázek na úvodní stránce. Napište 6 až 20 otázek, na které vaše dokumenty opravdu odpovídají.
+navrhy = []
+
+[sbirka]
+# ID datové schránky obce pro příkaz `python tasks.py sbirka` (stažení předpisů ze Sbírky právních předpisů).
+vydavatel = ""
+
+[osobni_udaje]
+# hlasit   = sestavení nálezy osobních údajů jen vypíše (rozhodnete sami)
+# vynechat = dokument, ve kterém se najde osobní údaj, se do chatbota nedostane
+rezim = "hlasit"

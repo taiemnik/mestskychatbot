@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Tajemství: klíč k modelu a heslo patří jen sem
+.env
+.env.*
+
+# Pracovní soubory sestavení (mezipaměť embeddingů). Hotový index v data/index/ se do repa ukládá – nasazuje se.
+data/cache/
+
+# Dokumenty odložené stranou (složky i soubory začínající podtržítkem chatbot nečte): zrušené předpisy,
+# dokumenty s osobními údaji. Do repa nepatří.
+dokumenty/**/_*
+
+# Místní nastavení programovacích agentů (oprávnění, cesty na tomto počítači)
+.claude/
+.cursor/
+.codex/
+
+# Zpětná vazba uživatelů (jejich dotazy) zůstává na počítači nebo serveru
+data/feedback.jsonl
+
+# Windows / macOS / synchronizované disky
+desktop.ini
+Thumbs.db
+.DS_Store
+*.gdoc
+*.gsheet

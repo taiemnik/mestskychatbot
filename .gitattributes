@@ -1,0 +1,3 @@
+# Zkušební soubory a soubory indexu se ukládají přesně tak, jak jsou (bez převodu konců řádků).
+tests/fixtures/** -text
+data/index/** -text

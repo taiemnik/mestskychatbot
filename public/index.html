@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#1d4f91">
+  <title>Chatbot</title>
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
+  <link rel="stylesheet" href="styles.css">
+  <!-- barvy podle chatbot.toml (soubor vzniká při sestavení indexu) -->
+  <link rel="stylesheet" href="vzhled.css">
+</head>
+<body>
+  <!-- Stránka je čisté HTML, CSS a JS bez sestavování a bez knihoven z internetu (hlavička CSP nic jiného
+       nepustí). Veškerý text ze serveru se vkládá jako prostý text (app.js), nikdy jako HTML.
+       Rozvržení: vlevo postranní panel (historie, poznámky), uprostřed vlákno dotazů a pole pro dotaz,
+       vpravo znění předpisu nebo poznámky. Panel vpravo vyjíždí vedle vlákna (vlákno zůstává vidět) a dá se
+       zasunout zpět; vrátí ho tlačítko v horní liště. Historie i poznámky žijí jen v prohlížeči (localStorage).
+       Název, organizaci a texty dosazuje app.js z nastaveni.js do prvků s atributem data-nastaveni. -->
+
+  <!-- Ikony: jedna sada symbolů, na které se odkazuje <use href="#i-…">. Žádné obrázky z internetu. -->
+  <svg hidden aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <!-- logo: bublina na dlaždici v hlavní barvě (stejná kresba jako logo.svg – ikona stránky); barvu určuje styles.css -->
+    <symbol id="i-logo" viewBox="0 0 64 64">
+      <rect class="logo-tile" x="3" y="3" width="58" height="58" rx="15"/>
+      <path class="logo-bubble" d="M18 18h28a6 6 0 0 1 6 6v14a6 6 0 0 1-6 6H32l-9 8v-8h-5a6 6 0 0 1-6-6V24a6 6 0 0 1 6-6Z"/>
+      <path class="logo-line" d="M22 28h20M22 35h13" fill="none" stroke-width="3.2" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 19V5m0 0-6 6m6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-side" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9 4v16" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5 15V6a2 2 0 0 1 2-2h9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-note" viewBox="0 0 24 24"><path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M14 3v6h6M9 13h6M9 17h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M7 4h10a1 1 0 0 1 1 1v16l-6-4-6 4V5a1 1 0 0 1 1-1Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4l10.5-10.5a2 2 0 0 0 0-2.8l-1.2-1.2a2 2 0 0 0-2.8 0L4 16v4Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M5 7h14M10 11v6M14 11v6M7 7l1 13h8l1-13M9 7V4h6v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-print" viewBox="0 0 24 24"><path d="M7 8V4h10v4M7 17H5a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-2M7 14h10v6H7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-doc" viewBox="0 0 24 24"><path d="M5 4h10l4 4v12H5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 12h8M8 16h8M8 8h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14m0 0-5-5m5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-tuck" viewBox="0 0 24 24"><path d="m6 6 6 6-6 6M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4.5 4.5L19 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 11v5M12 8v.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3c.6 4.6 2.4 6.4 7 7-4.6.6-6.4 2.4-7 7-.6-4.6-2.4-6.4-7-7 4.6-.6 6.4-2.4 7-7Z" fill="currentColor"/></symbol>
+    <symbol id="i-thumb-up" viewBox="0 0 24 24"><path d="M7 11v9H4a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3Zm0 0 4-7.5a2 2 0 0 1 2.9 1.8L13 9h5.5a2 2 0 0 1 2 2.4l-1.3 6.5A2 2 0 0 1 17.2 20H7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-thumb-down" viewBox="0 0 24 24"><path d="M17 13V4h3a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-3Zm0 0-4 7.5a2 2 0 0 1-2.9-1.8L11 15H5.5a2 2 0 0 1-2-2.4l1.3-6.5A2 2 0 0 1 6.8 4H17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4V6Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+  </svg>
+
+  <a class="skip" href="#otazka">Přejít na dotaz</a>
+
+  <!-- ====================== postranní panel ====================== -->
+  <div class="backdrop" id="zaclona" hidden></div>
+  <nav class="side" id="panel-bocni" aria-label="Historie a poznámky">
+    <div class="side__top">
+      <div class="brand">
+        <svg class="logo brand__mark" aria-hidden="true"><use href="#i-logo"/></svg>
+        <div class="brand__text">
+          <span class="brand__name" data-nastaveni="nazev"></span>
+          <span class="brand__sub" data-nastaveni="organizace" data-skryt="prazdne"></span>
+        </div>
+      </div>
+      <button id="zavrit-bocni" class="icon-btn icon-btn--ghost side__close" type="button" aria-label="Skrýt postranní panel" data-tip="Skrýt panel">
+        <svg class="ico" aria-hidden="true"><use href="#i-side"/></svg>
+      </button>
+    </div>
+
+    <button id="novy" class="side__new" type="button">
+      <svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg>
+      <span>Nový dotaz</span>
+    </button>
+
+    <div class="side__section side__section--hist">
+      <div class="side__head">
+        <span class="side__label">Historie</span>
+        <button id="smazat-historii" class="side__tiny" type="button" hidden>Vymazat</button>
+      </div>
+      <ul class="hist" id="historie" aria-label="Předchozí dotazy"></ul>
+      <p class="side__empty" id="historie-prazdna">Zatím žádný dotaz. Historie zůstává jen ve vašem prohlížeči.</p>
+    </div>
+
+    <div class="side__section side__section--notes">
+      <button id="otevrit-poznamky" class="side__item side__item--notes" type="button">
+        <svg class="ico" aria-hidden="true"><use href="#i-bookmark"/></svg>
+        <span>Moje poznámky</span>
+        <span class="count" id="pocet-poznamek" hidden>0</span>
+      </button>
+    </div>
+
+    <div class="side__bottom">
+      <!-- odhlášení: jen když je zapnuté heslo -->
+      <button id="odhlasit" class="side__item" type="button" hidden>
+        <svg class="ico" aria-hidden="true"><use href="#i-lock"/></svg>
+        <span>Odhlásit</span>
+      </button>
+      <button id="rezim" class="side__item" type="button" aria-label="Přepnout světlý a tmavý režim">
+        <svg class="ico ico--sun" aria-hidden="true"><use href="#i-sun"/></svg>
+        <svg class="ico ico--moon" aria-hidden="true"><use href="#i-moon"/></svg>
+        <span class="rezim__text">Tmavý režim</span>
+      </button>
+      <p class="side__links" id="odkazy" hidden></p>
+      <p class="side__state" id="stav">Načítám stav…</p>
+      <p class="side__note">Závazné je znění předpisu, ne odpověď chatbota.</p>
+    </div>
+  </nav>
+
+  <!-- ====================== hlavní část ====================== -->
+  <div class="app" id="app">
+    <main class="main" id="main">
+      <header class="bar">
+        <div class="bar__left">
+          <button id="otevrit-bocni" class="icon-btn icon-btn--ghost" type="button" aria-label="Zobrazit postranní panel" data-tip="Historie a poznámky">
+            <svg class="ico" aria-hidden="true"><use href="#i-menu"/></svg>
+          </button>
+          <span class="bar__title" data-nastaveni="nazev"></span>
+        </div>
+        <div class="bar__right">
+          <!-- zasunutý panel (znění / poznámky): tlačítko ho vysune zpět -->
+          <button id="vysunout" class="bar__panel" type="button" hidden>
+            <svg class="ico" aria-hidden="true"><use href="#i-doc"/></svg>
+            <span id="vysunout-text">Znění předpisu</span>
+          </button>
+          <button id="novy-bar" class="icon-btn icon-btn--ghost" type="button" aria-label="Nový dotaz" data-tip="Nový dotaz">
+            <svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <div id="pruh" class="banner" role="status" hidden></div>
+
+      <div class="scroll" id="rolovani">
+        <div class="column">
+          <!-- úvod: jen dokud ve vlákně nic není -->
+          <section class="intro" id="uvod">
+            <svg class="logo intro__mark" aria-hidden="true"><use href="#i-logo"/></svg>
+            <h1 class="intro__title">Dobrý den. Na co se chcete zeptat?</h1>
+            <p class="intro__text" data-nastaveni="popis"></p>
+          </section>
+
+          <div class="thread" id="vlakno" aria-live="polite" aria-relevant="additions"></div>
+        </div>
+      </div>
+
+      <button id="dolu" class="fab" type="button" aria-label="Přejít na konec" hidden>
+        <svg class="ico" aria-hidden="true"><use href="#i-down"/></svg>
+      </button>
+
+      <!-- pole pro dotaz: drží u spodního okraje, nad ním návrhy otázek -->
+      <div class="composer">
+        <div class="column">
+          <!-- Návrhy otázek: náhodný výběr z ověřené palety (otazky.json), při každém načtení a po každé odpovědi jiný. -->
+          <section class="suggest" id="navrhy" aria-label="Návrhy otázek" hidden>
+            <div class="suggest__head">
+              <span class="suggest__label">Zkuste třeba</span>
+              <button id="jine" class="icon-btn icon-btn--tiny" type="button" aria-label="Nabídnout jiné otázky" data-tip="Jiné otázky">
+                <svg class="ico" aria-hidden="true"><use href="#i-refresh"/></svg>
+              </button>
+            </div>
+            <ul class="examples" id="priklady"></ul>
+          </section>
+
+          <form class="ask" id="formular" autocomplete="off">
+            <label class="sr-only" for="otazka">Váš dotaz</label>
+            <div class="ask__box">
+              <textarea id="otazka" class="ask__input" rows="1" maxlength="500" required
+                        placeholder="Napište dotaz… Nevkládejte prosím osobní ani jiné citlivé údaje."
+                        aria-describedby="napoveda pocet"></textarea>
+              <div class="ask__row">
+                <span id="napoveda" class="ask__hint"><kbd>Enter</kbd> odešle · <kbd>Shift</kbd>+<kbd>Enter</kbd> nový řádek</span>
+                <span id="pocet" class="ask__count" hidden></span>
+                <button id="odeslat" class="send" type="submit" aria-label="Odeslat dotaz" data-tip="Odeslat (Enter)">
+                  <svg class="ico ico--send" aria-hidden="true"><use href="#i-send"/></svg>
+                  <svg class="ico ico--stop" aria-hidden="true"><use href="#i-stop"/></svg>
+                </button>
+              </div>
+            </div>
+            <p class="ask__meta">Dotaz zpracovává jazykový model – nepište do něj osobní ani citlivé údaje. <span data-nastaveni="upozorneni"></span></p>
+          </form>
+        </div>
+      </div>
+    </main>
+
+    <!-- ====================== znění předpisu ====================== -->
+    <aside class="panel doc" id="predpis" aria-labelledby="predpis-nazev" tabindex="-1" hidden>
+      <header class="panel__head">
+        <div class="panel__titles">
+          <p class="panel__kicker">Znění předpisu</p>
+          <h2 class="panel__title" id="predpis-nazev"></h2>
+          <dl class="doc__meta" id="predpis-udaje"></dl>
+        </div>
+        <div class="panel__tools">
+          <button id="predpis-kopirovat-odkaz" class="icon-btn" type="button" aria-label="Kopírovat odkaz na tento odstavec" data-tip="Kopírovat odkaz">
+            <svg class="ico" aria-hidden="true"><use href="#i-link"/></svg>
+          </button>
+          <button id="predpis-stahnout" class="icon-btn" type="button" aria-label="Stáhnout znění jako textový soubor" data-tip="Stáhnout znění (.txt)">
+            <svg class="ico" aria-hidden="true"><use href="#i-download"/></svg>
+          </button>
+          <button id="predpis-tisk" class="icon-btn" type="button" aria-label="Vytisknout nebo uložit jako PDF" data-tip="Tisk / uložit jako PDF">
+            <svg class="ico" aria-hidden="true"><use href="#i-print"/></svg>
+          </button>
+          <button id="zasunout" class="icon-btn" type="button" aria-label="Zasunout znění doprava" data-tip="Zasunout doprava">
+            <svg class="ico" aria-hidden="true"><use href="#i-tuck"/></svg>
+          </button>
+          <button id="zavrit" class="icon-btn" type="button" aria-label="Zavřít znění předpisu" data-tip="Zavřít (Esc)">
+            <svg class="ico" aria-hidden="true"><use href="#i-close"/></svg>
+          </button>
+        </div>
+      </header>
+      <div class="doc__notes" id="predpis-poznamky"></div>
+      <div class="panel__body doc__body" id="predpis-text"></div>
+    </aside>
+
+    <!-- ====================== poznámky ====================== -->
+    <aside class="panel notes" id="poznamky" aria-labelledby="poznamky-nazev" tabindex="-1" hidden>
+      <header class="panel__head">
+        <div class="panel__titles">
+          <p class="panel__kicker">Jen ve vašem prohlížeči</p>
+          <h2 class="panel__title" id="poznamky-nazev">Moje poznámky</h2>
+        </div>
+        <div class="panel__tools">
+          <button id="poznamka-nova" class="icon-btn" type="button" aria-label="Nová vlastní poznámka" data-tip="Nová poznámka">
+            <svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg>
+          </button>
+          <button id="poznamky-stahnout" class="icon-btn" type="button" aria-label="Stáhnout všechny poznámky" data-tip="Stáhnout vše (.txt)">
+            <svg class="ico" aria-hidden="true"><use href="#i-download"/></svg>
+          </button>
+          <button id="zasunout-poznamky" class="icon-btn" type="button" aria-label="Zasunout poznámky doprava" data-tip="Zasunout doprava">
+            <svg class="ico" aria-hidden="true"><use href="#i-tuck"/></svg>
+          </button>
+          <button id="zavrit-poznamky" class="icon-btn" type="button" aria-label="Zavřít poznámky" data-tip="Zavřít (Esc)">
+            <svg class="ico" aria-hidden="true"><use href="#i-close"/></svg>
+          </button>
+        </div>
+      </header>
+      <div class="panel__body notes__body" id="poznamky-seznam"></div>
+      <p class="notes__empty" id="poznamky-prazdne">
+        Zatím tu nic není. U každé odpovědi je tlačítko <strong>Uložit do poznámek</strong> – odpověď i zdroje tu pak najdete
+        a můžete si k nim připsat vlastní text. Poznámky zůstávají jen v tomto prohlížeči.
+      </p>
+    </aside>
+  </div>
+
+  <!-- ====================== varování před odesláním: dotaz možná obsahuje osobní údaj ====================== -->
+  <dialog class="confirm" id="varovani" aria-labelledby="varovani-nazev" aria-describedby="varovani-text">
+    <h2 class="confirm__title" id="varovani-nazev">
+      <svg class="ico" aria-hidden="true"><use href="#i-info"/></svg>
+      <span>Není v dotazu osobní údaj?</span>
+    </h2>
+    <p class="confirm__text" id="varovani-text"></p>
+    <p class="confirm__hint">Dotaz zpracovává jazykový model. K odpovědi z předpisů osobní údaje nepotřebuje – zeptejte se prosím obecně
+      (například „soused“ místo jména).</p>
+    <div class="confirm__row">
+      <button id="varovani-zpet" class="btn" type="button">Zpět k úpravě</button>
+      <button id="varovani-odeslat" class="btn btn--ghost" type="button">Přesto odeslat</button>
+    </div>
+  </dialog>
+
+  <!-- ====================== přihlášení heslem (jen když je na serveru heslo zapnuté) ====================== -->
+  <div class="gate" id="zamek" hidden>
+    <form class="gate__card" id="prihlaseni" autocomplete="off">
+      <svg class="logo gate__mark" aria-hidden="true"><use href="#i-logo"/></svg>
+      <h1 class="gate__title" data-nastaveni="nazev"></h1>
+      <p class="gate__text">Tento chatbot je přístupný jen s heslem. Zadejte ho prosím.</p>
+      <label class="sr-only" for="heslo">Heslo</label>
+      <input id="heslo" class="gate__input" type="password" name="heslo" placeholder="Heslo" maxlength="200" required
+             autocomplete="current-password" aria-describedby="heslo-chyba">
+      <p class="gate__error" id="heslo-chyba" role="alert" hidden></p>
+      <button id="vstoupit" class="btn gate__btn" type="submit">Vstoupit</button>
+    </form>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="nastaveni.js" defer></script>
+  <script src="osobni-udaje.js" defer></script>
+  <script src="app.js" defer></script>
+</body>
+</html>

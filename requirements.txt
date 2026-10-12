@@ -1,0 +1,5 @@
+# Běh chatbota (server nebo hosting). Sestavení indexu, místní spuštění a testy: requirements-dev.txt
+# Horní meze: vyzkoušeno s verzemi do těchto řad; novější hlavní verze může změnit chování.
+fastapi>=0.110,<1
+numpy>=1.26,<3
+httpx>=0.27,<1

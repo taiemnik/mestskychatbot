@@ -1,0 +1,46 @@
+{
+  "zdroj": "https://sbirkapp.gov.cz/vydavatel/abc1234",
+  "stazeno": "2026-10-01",
+  "dokumenty": {
+    "sbirka/ozv-2025-05-o-mistnim-poplatku-ze-psu.md": {
+      "nazev": "o místním poplatku ze psů",
+      "druh": "Obecně závazná vyhláška",
+      "cislo": "5/2025",
+      "vyhlaseno": "2025-12-12",
+      "ucinnost_od": "2026-01-01",
+      "zdroj": "https://sbirkapp.gov.cz/detail/SPPVZOR0000000A1",
+      "poznamka": "",
+      "prilohy": []
+    },
+    "sbirka/ozv-2026-02-o-nocnim-klidu.md": {
+      "nazev": "o nočním klidu",
+      "druh": "Obecně závazná vyhláška",
+      "cislo": "2/2026",
+      "vyhlaseno": "2026-04-14",
+      "ucinnost_od": "2026-04-29",
+      "zdroj": "https://sbirkapp.gov.cz/detail/SPPVZOR0000000A2",
+      "poznamka": "",
+      "prilohy": []
+    },
+    "sbirka/narizeni-2024-02-trzni-rad.md": {
+      "nazev": "Tržní řád",
+      "druh": "Nařízení",
+      "cislo": "2/2024",
+      "vyhlaseno": "2024-08-12",
+      "ucinnost_od": "2024-09-01",
+      "zdroj": "https://sbirkapp.gov.cz/detail/SPPVZOR0000000A3",
+      "poznamka": "",
+      "prilohy": []
+    },
+    "sbirka/ozv-2007-03-o-zrizeni-mestske-policie.txt": {
+      "nazev": "o zřízení městské policie",
+      "druh": "Obecně závazná vyhláška",
+      "cislo": "3/2007",
+      "vyhlaseno": "2007-06-11",
+      "ucinnost_od": "2007-08-01",
+      "zdroj": "https://sbirkapp.gov.cz/detail/SPPVZOR0000000A4",
+      "poznamka": "Pozor: tento předpis byl změněn předpisem č. 2/2022 – ověřte znění i tam.",
+      "prilohy": []
+    }
+  }
+}
