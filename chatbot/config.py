@@ -29,8 +29,11 @@ class Settings:
     # míra „uvažování“ u modelů, které uvažují (gpt-5…, gpt-6…): u gpt-5 nejníž „minimal“, u gpt-6 „none“.
     # Prázdné = rozhodne model – bývá to pomalé a dražší a krátký limit se spotřebuje dřív, než přijde odpověď.
     reasoning_effort: str = ""
-    embed_model: str = "text-embedding-3-small"
-    embed_dim: int = 512                # 0 = rozměr určí model sám (pro modely, které zmenšení rozměru neumějí)
+    # Větší embeddingový model a rozměr 1024: na sadě běžně položených českých otázek nad vyhláškami byl správný
+    # odstavec první podle významu u 68 % otázek (menší model, rozměr 512: 49 %) a model ho dostal u 98 % (93 %).
+    # Změna modelu nebo rozměru = sestavit index znovu (python tasks.py build).
+    embed_model: str = "text-embedding-3-large"
+    embed_dim: int = 1024               # 0 = rozměr určí model sám (pro modely, které zmenšení rozměru neumějí)
     # --- soubory ---
     documents_dir: Path = ROOT / "dokumenty"                  # sem patří dokumenty, ze kterých chatbot odpovídá
     index_dir: Path = ROOT / "data" / "index"                 # hotový index (ukládá se do repa a nasazuje)
@@ -51,7 +54,12 @@ class Settings:
     max_answer_chars: int = 2400        # delší odpověď modelu se nevydá (strukturovaná odpověď mívá 800–1 600 znaků)
     max_feedback_bytes: int = 12000     # tělo hodnocení (dotaz + odpověď + důvod); větší se odmítne dřív, než se čte
     max_feedback_comment_chars: int = 300
-    min_grounding: float = 0.5          # nejmenší podíl slov odpovědi, která jsou v citovaných úsecích
+    # nejmenší podíl obsahových slov odpovědi, která jsou v citovaných úsecích. Je to spodní hranice proti odpovědi,
+    # která s úseky nesouvisí; smysl ověřuje druhé volání modelu. Bez něj (VERIFY_ANSWER=0) nastavte aspoň 0.5.
+    min_grounding: float = 0.2
+    # druhé volání modelu: u každé věty hotové odpovědi ověří, že to, co tvrdí, v citovaných úsecích stojí
+    # (chatbot/guard/verify.py). Dotaz je s ním asi o polovinu dražší a o vteřinu až dvě delší (měřeno).
+    verify_answer: bool = True
     abuse_strikes: int = 3              # kolik pokusů o obcházení nebo vulgarit z jednoho prohlížeče, než přijde pauza
     abuse_window_min: int = 10          # v jakém čase se pokusy sčítají
     abuse_block_min: int = 10           # jak dlouhá pauza následuje
@@ -122,6 +130,8 @@ class Instance:
     popis: str = "Odpovídám z dokumentů, které mám k dispozici, a u každé odpovědi ukážu, kde přesně to v nich stojí."
     upozorneni: str = "Odpověď může obsahovat chyby. Závazné je vždy znění předpisu."
     kontakt: str = ""                   # kam se obrátit, když chatbot odpověď nezná
+    # co chatbot řekne, když odpověď v dokumentech není: z čeho odpovídá a kam jít jinam (prázdné = obecná věta)
+    nenalezeno: str = ""
     odkaz: str = ""                     # adresa, kde jsou dokumenty zveřejněné
     navod: str = ""                     # adresa návodu, jak si takového chatbota postavit (prázdné = neukazovat)
     barva: str = "#1d4f91"              # hlavní barva stránky
@@ -148,7 +158,8 @@ class Instance:
             raise ValueError(f"Soubor {path.name} nejde přečíst: {exc}") from None
         chatbot = data.get("chatbot") or {}
         values: dict = {key: " ".join(str(chatbot[key]).split())
-                        for key in ("nazev", "organizace", "popis", "upozorneni", "kontakt", "odkaz", "navod") if chatbot.get(key)}
+                        for key in ("nazev", "organizace", "popis", "upozorneni", "kontakt", "nenalezeno", "odkaz", "navod")
+                        if chatbot.get(key)}
         color = str((data.get("vzhled") or {}).get("barva") or "").strip()
         if color:
             if not _COLOR.fullmatch(color):

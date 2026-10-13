@@ -14,20 +14,20 @@ dokumenty/ (PDF, Word, Markdown, text, HTML; prehled.json s údaji)
   → chatbot/answer/     zadání pro model, ověření citací, „nenašel jsem“, měkký pád bez modelu
   → chatbot/api/        FastAPI: /api/ask, /api/feedback, /api/doc/{id}, /api/status, heslo, omezovače
   → public/             stránka s chatem (historie a poznámky v prohlížeči, zdroje, znění dokumentu)
-chatbot/guard/          filtr dotazu (před hledáním) a kontrola odpovědi (po modelu) – docs/ochrana.md
+chatbot/guard/          filtr dotazu (před hledáním), kontrola odpovědi (slova, čísla) a ověření druhým voláním modelu – docs/ochrana.md
 chatbot/llm/            jediné místo, kde se volá model (embeddingy i odpověď)
 chatbot/feedback/       zpětná vazba (palce): soubor JSONL, jinak jen log
 chatbot/config.py       Settings (prostředí, .env) a Instance (chatbot.toml)
 chatbot/web.py          z chatbot.toml vyrobí public/nastaveni.js, vzhled.css, logo.svg, otazky.json
 chatbot/precheck.py     kontrola před zveřejněním
-chatbot/evalcheck.py    zkušební otázky a sada útoků
+chatbot/evalcheck.py    zkušební otázky (hledání i správnost odpovědí po vrstvách) a sada útoků
 tasks.py                příkazy: sbirka, build, serve, check, kontrola
 ```
 
 ## Dvě cesty kódem
 
 - **Sestavení** (`tasks.py sbirka`, `build`; jen na počítači s dokumenty): `ingest → index (+ llm pro embeddingy) → web`. Potřebuje knihovny z `requirements-dev.txt` (pypdf, python-docx, beautifulsoup4).
-- **Běh** (server nebo hosting): `api → guard → search → answer → llm → guard`. Čte jen hotový index. Balík `chatbot.ingest` ani knihovny pro čtení dokumentů se při běhu nenačítají (hlídá test) – na serveru nemusí být nainstalované a běžící chatbot se k originálům dokumentů nedostane.
+- **Běh** (server nebo hosting): `api → guard → search → answer → llm → guard → llm (ověření vět) → guard`. Čte jen hotový index. Balík `chatbot.ingest` ani knihovny pro čtení dokumentů se při běhu nenačítají (hlídá test) – na serveru nemusí být nainstalované a běžící chatbot se k originálům dokumentů nedostane.
 
 ## Pravidla
 

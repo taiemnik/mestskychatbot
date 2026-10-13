@@ -57,7 +57,7 @@ Stáhnou se předpisy, které dnes platí, do `dokumenty/sbirka/`, a zapíše se
 
 ## Krok 3 – nastavení
 
-Uprav `chatbot.toml`: `nazev`, `organizace`, `popis` (z čeho chatbot odpovídá), `odkaz` (kde jsou předpisy zveřejněné – u Sbírky adresa stránky obce), `kontakt`, `barva`. Návrhy otázek (`[otazky] navrhy`) doplníš v kroku 6, až uvidíš, co v dokumentech je.
+Uprav `chatbot.toml`: `nazev`, `organizace`, `popis` (z čeho chatbot odpovídá), `odkaz` (kde jsou předpisy zveřejněné – u Sbírky adresa stránky obce), `kontakt`, `nenalezeno` (co chatbot řekne, když odpověď v dokumentech není: z čeho odpovídá a kam jít jinam – lidé se „chatbota města“ ptají i na starostu a úřední hodiny), `barva`. Návrhy otázek (`[otazky] navrhy`) doplníš v kroku 6, až uvidíš, co v dokumentech je.
 
 ## Krok 4 – klíč
 
@@ -86,16 +86,19 @@ Namátkou ověř dva tři předpisy: `python tasks.py serve`, otevři stránku, 
 
 ## Krok 6 – zkušební otázky a návrhy na stránku
 
-Sepiš 15 až 25 otázek, na které dokumenty jednoznačně odpovídají, do `eval/otazky.jsonl` (formát v `eval/README.md`). Úryvek `contains` opiš z textu dokumentu doslova. Otázky dej člověku zkontrolovat – on ví, na co se lidé ptají.
+Sepiš aspoň 60 otázek do `eval/otazky.jsonl` (formát v `eval/README.md`): polovinu tak, jak se lidé opravdu ptají (běžnými slovy, heslovitě, bez diakritiky), k tomu otázky podle textu předpisů, pár s odkazem na číslo předpisu a článek a aspoň pět **mimo dokumenty**, na které chatbot odpovědět nemá. U otázek s jednoznačným údajem doplň `fakta` (částka, lhůta). Úryvek `contains` opiš z textu dokumentu doslova. Otázky dej člověku zkontrolovat – on ví, na co se lidé ptají. Sada psaná jen slovy předpisu vyjde skoro vždy a neřekne nic.
 
 ```bash
-python tasks.py check             # práh: správný odstavec nalezen aspoň u 90 % otázek
+python tasks.py check             # prahy: nalezeno 90 %, správně zodpovězeno 80 %, mimo dokumenty bez odpovědi 90 %
+python tasks.py check --hledani   # kde se správný odstavec ztrácí: podle slov, podle významu, po sloučení
 python tasks.py check --utoky     # pokusy o obcházení; vypsané odpovědi přečti
 ```
 
+U otázek, které nevyšly, výpis říká proč. „Zahodila kontrola odpovědi“ znamená, že model odpověděl a server odpověď nevydal – přečti si kód důvodu v `docs/ochrana.md`, než začneš cokoli povolovat. Výsledek se mezi běhy liší o jednu až tři otázky; nelaď podle jednoho běhu.
+
 Sada útoků má ve vrstvě `model` dotazy na běžné vyhlášky (poplatek ze psů, noční klid, odpad). Když je chatbot nad jinými dokumenty, přepiš v těch řádcích názvy na dokumenty, které v něm jsou – útok na dokument, který chatbot nemá, nic neověří. Vypsané odpovědi přečti celé, až do konce, a ukaž člověku ty, ve kterých chatbot hodnotí, radí nebo píše něco, co v dokumentech není.
 
-**Bez klíče** (po `build --fake`) oba příkazy běží taky, jen měří míň: `check` vyhodnotí hledání podle slov (práh 90 % ber jako orientační, citace a odpovědi ověříš až s klíčem), `check --utoky` jen vstupní filtr. Výpis to sám řekne.
+**Bez klíče** (po `build --fake`) příkazy běží taky, jen měří míň: `check` vyhodnotí hledání podle slov (práh 90 % ber jako orientační, citace a správnost odpovědí ověříš až s klíčem), `check --utoky` jen vstupní filtr. Výpis to sám řekne.
 
 Do `chatbot.toml`, `[otazky] navrhy`, vyber 6 až 20 otázek ze sady, které prošly, a spusť znovu `python tasks.py build`. Nikdy tam nedávej otázku, na kterou chatbot neodpoví – je to první věc, kterou návštěvník zkusí.
 
@@ -140,7 +143,8 @@ Chce-li člověk chatbota jen ve vlastní síti, je to odstavec „U sebe na sí
 | limity, model, heslo | `.env` (vzor `env.vzor.txt`) – upravuje člověk |
 | jak se poznává článek, odstavec, podpis | `chatbot/ingest/markers.py` |
 | čtení souborů (PDF, Word, Markdown) | `chatbot/ingest/extract.py` |
-| zadání pro model | `chatbot/answer/prompt.py` |
+| zadání pro model a pro kontrolora odpovědí | `chatbot/answer/prompt.py` |
+| co server udělá s odpovědí (čísla, opora, ověření vět) | `chatbot/guard/answer.py`, `numbers.py`, `verify.py`, `chatbot/answer/service.py` |
 | vzory pokusů o obcházení | `chatbot/guard/patterns.py` + řádek do `eval/utoky.jsonl` |
 | vzhled stránky | `public/styles.css` (barvy jen přes `chatbot.toml`) |
 

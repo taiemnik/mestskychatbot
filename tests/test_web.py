@@ -69,7 +69,7 @@ def test_vychozi_soubor_v_repu_je_platny_a_neutralni():
 def test_settings_z_prostredi_a_env_soubor(tmp_path, monkeypatch):
     settings = Settings.from_env({"EMBED_DIM": "0", "CHAT_MODEL": "jiny-model", "RATE_LIMIT_PER_MIN": "3"})
     assert (settings.embed_dim, settings.chat_model, settings.rate_limit_per_min) == (0, "jiny-model", 3)
-    assert settings.embed_model == "text-embedding-3-small"
+    assert settings.embed_model == "text-embedding-3-large"
     env_file = tmp_path / ".env"
     env_file.write_text("# komentář\nCHATBOT_TEST_A=ze-souboru\nCHATBOT_TEST_B = \"v uvozovkách\"\n", encoding="utf-8")
     monkeypatch.setenv("CHATBOT_TEST_A", "z-prostredi")
@@ -176,7 +176,7 @@ def test_kontrola_ostry_index_projde(project, monkeypatch):
     """Ostrý index se pozná podle modelu v manifestu – stačí přepsat název, embeddingy kontrola nečte."""
     tasks.main(["build", "--fake"])
     manifest = project / "data" / "index" / "manifest.json"
-    manifest.write_text(manifest.read_text(encoding="utf-8").replace("fake-bag-of-words", "text-embedding-3-small"), encoding="utf-8")
+    manifest.write_text(manifest.read_text(encoding="utf-8").replace("fake-bag-of-words", "text-embedding-3-large"), encoding="utf-8")
     (project / "eval" / "otazky.jsonl").write_text('{"question": "Kdy platí noční klid?", "doc": "2/2026", "contains": "do šesté hodiny"}\n',
                                                    encoding="utf-8")
     result = run_precheck(project, Settings.from_env())
@@ -204,6 +204,20 @@ def test_check_bez_klice_meri_jen_hledani(project, capsys):
     code = tasks.main(["check"])
     out = capsys.readouterr().out
     assert code == 0 and "Nalezeno: 1 z 1" in out and "bez modelu" in out
+
+
+def test_check_hledani_vypise_poradi_po_vrstvach(project, capsys):
+    """`check --hledani` říká, kde se správný odstavec ztrácí: podle slov, podle významu, po sloučení."""
+    tasks.main(["build", "--fake"])
+    (project / "eval" / "otazky.jsonl").write_text(
+        '{"question": "Kdy platí noční klid?", "doc": "2/2026", "contains": "do šesté hodiny"}' + chr(10)
+        + '{"question": "Kdo je starosta?", "typ": "mimo"}' + chr(10), encoding="utf-8")
+    capsys.readouterr()
+    code = tasks.main(["check", "--hledani"])
+    out = capsys.readouterr().out
+    assert code == 0 and "Hledání po vrstvách (1 otázek" in out and "jen slova" in out and "dostane model" in out
+    # proti nasazené adrese to nejde – pořadí zná jen místní index
+    assert tasks.main(["check", "--hledani", "--url", "https://adresa.example"]) == 2
 
 
 def test_utoky_bez_klice_vyhodnoti_jen_filtr(project, capsys):
@@ -268,7 +282,7 @@ def test_zkouska_portu_umi_i_adresu_ipv6():
 def test_kontrola_pozna_zastarale_navrhy_otazek(project):
     tasks.main(["build", "--fake"])
     manifest = project / "data" / "index" / "manifest.json"
-    manifest.write_text(manifest.read_text(encoding="utf-8").replace("fake-bag-of-words", "text-embedding-3-small"), encoding="utf-8")
+    manifest.write_text(manifest.read_text(encoding="utf-8").replace("fake-bag-of-words", "text-embedding-3-large"), encoding="utf-8")
     (project / "eval" / "otazky.jsonl").write_text('{"question": "Kdy platí noční klid?", "doc": "2/2026", "contains": "do šesté hodiny"}\n',
                                                    encoding="utf-8")
     assert run_precheck(project, Settings.from_env()).ok

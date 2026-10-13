@@ -2,13 +2,18 @@
 
 Model se dá přemluvit, i když má v zadání zákazy. Odpověď se proto vydá jen tehdy, když vypadá
 jako odpověď z předpisů: nepřesahuje délku, neprozrazuje zadání, neobsahuje cizí odkazy ani
-značky, není vulgární a většina jejích slov je v citovaných úsecích. Jinak se uživateli vrátí
-„nenašel jsem“ a do logu jde jen kód důvodu.
+značky, není vulgární, neuvádí číslo, které v citovaných úsecích není, a dost jejích slov je v citovaných
+úsecích. Jinak se uživateli vrátí „nenašel jsem“ a do logu jde jen kód důvodu.
+
+Co tahle kontrola neumí: poznat, že odpověď složená ze správných slov a čísel říká něco jiného než předpis
+(„od šesté do dvacáté druhé“ místo „od dvacáté druhé do šesté“). To ověřuje druhé volání modelu
+(chatbot/guard/verify.py); podíl slov je jen spodní hranice proti odpovědi, která s úseky nesouvisí vůbec.
 """
 from __future__ import annotations
 
 import re
 
+from chatbot.guard.numbers import unsupported_numbers
 from chatbot.guard.patterns import VULGAR
 from chatbot.guard.question import plain
 from chatbot.search.lexical import tokenize
@@ -20,7 +25,7 @@ _MARKER = re.compile(r"\[\d+\]")
 MIN_WORDS = 3       # kratší odpověď („Ano [1].“) se nedá ověřit – nevydá se
 UNCITED_MIN = 0.5   # věta, za kterou už nenásleduje značka zdroje, musí mít aspoň tolik svých slov v citovaných úsecích
 # konec věty: tečka, vykřičník, otazník (i se značkou zdroje za ním), za kterým začíná další věta velkým písmenem.
-# „31. 10. příslušného roku“ ani „čl. 5 odst. 2“ větu nedělí – za tečkou stojí číslo nebo malé písmeno.
+# „31. 3. příslušného roku“ ani „čl. 5 odst. 2“ větu nedělí – za tečkou stojí číslo nebo malé písmeno.
 _SENTENCE_BREAK = re.compile(r"(?<=[.!?…\]])\s+(?=[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ„\"(])")
 # běžná slova, která obsah nenesou – při posuzování opory jedné věty se nepočítají („Tento asistent je k ničemu.“
 # má s každým předpisem společné „tento“ a „je“)
@@ -35,10 +40,14 @@ _COMMON = frozenset(token for word in (
 
 
 def check_answer(answer: str, cited_texts: list[str], *, leak_marker: str, max_chars: int,
-                 min_grounding: float) -> str | None:
+                 min_grounding: float, number_texts: list[str] | None = None) -> str | None:
     """Vrátí kód důvodu, proč odpověď nevydat, nebo None, když je v pořádku.
 
-    Kódy: dlouha | unik | znacky | odkaz | vulgarni | bez-opory
+    Kódy: dlouha | unik | znacky | odkaz | vulgarni | cislo | bez-opory
+
+    `cited_texts` jsou citované úseky i s názvem předpisu a článku a s upozorněním k dokumentu – model je
+    u úseku vidí a smí je jmenovat. `number_texts` je širší podklad jen pro čísla: i ostatní nalezené úseky
+    citovaných předpisů (model občas správné číslo ocituje u vedlejšího odstavce); bez něj platí `cited_texts`.
     """
     if len(answer) > max_chars:
         return "dlouha"
@@ -51,14 +60,41 @@ def check_answer(answer: str, cited_texts: list[str], *, leak_marker: str, max_c
         return "odkaz"                                  # odkaz, který v citovaném předpisu není
     if VULGAR.search(plain(answer)) and not VULGAR.search(plain(sources)):
         return "vulgarni"
+    if unsupported_numbers(answer, number_texts or cited_texts):
+        return "cislo"                                  # částka, lhůta nebo datum, které v citovaných předpisech není
+    if _MARKER.sub("", answer).rstrip().endswith(":"):
+        return "bez-opory"                              # z výčtu zbylo jen uvedení („… má tyto výjimky:“) – to odpověď není
     if _grounding(answer, sources) < min_grounding:
         return "bez-opory"
     return None
 
 
+# Tečka za zkratkou nebo za iniciálou větu nekončí („ul. Dlouhá“, „nám. T. G. Masaryka“, „např. Městský úřad“).
+# Iniciála je jen velké písmeno: „120 l.“ nebo „6 h.“ větu končí – jinak by se s ní slila věta přilepená za ni.
+_ABBREVIATION = re.compile(r"(?:^|[\s(„])(?:(?i:ul|nám|tř|č|čl|odst|písm|např|tj|tzv|popř|resp|mj|parc|sv|kat|ing|mgr|bc|dr|ml)"
+                           r"|[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ])\.$")
+
+
+def _line_sentences(line: str) -> list[str]:
+    pieces: list[str] = []
+    for piece in (part.strip() for part in _SENTENCE_BREAK.split(line)):
+        if not piece:
+            continue
+        if pieces and _ABBREVIATION.search(pieces[-1]):
+            pieces[-1] += " " + piece                   # předchozí kus skončil zkratkou – věta pokračuje
+        else:
+            pieces.append(piece)
+    return pieces
+
+
+def split_lines(text: str) -> list[list[str]]:
+    """Odpověď po řádcích (odrážkách) a ty po větách; značka zdroje zůstává u své věty. Prázdný řádek = prázdný seznam."""
+    return [_line_sentences(line) for line in text.split("\n")]
+
+
 def sentences(text: str) -> list[str]:
-    """Odpověď po větách (a odrážkách – každý řádek zvlášť); značka zdroje zůstává u své věty."""
-    return [piece.strip() for line in text.split("\n") for piece in _SENTENCE_BREAK.split(line) if piece.strip()]
+    """Odpověď po větách (a odrážkách – každý řádek zvlášť), v pořadí, ve kterém se čtou."""
+    return [piece for line in split_lines(text) for piece in line]
 
 
 def drop_unsupported(answer: str, cited_texts: list[str]) -> str:
@@ -78,12 +114,16 @@ def drop_unsupported(answer: str, cited_texts: list[str]) -> str:
     Při zkoušce na 155 skutečných odpovědích se pravidlo dotklo jediné věty, a ta právě jen jmenovala předpis.
     """
     sources = set(tokenize("\n".join(cited_texts)))
-    lines = [[piece.strip() for piece in _SENTENCE_BREAK.split(line) if piece.strip()] for line in answer.split("\n")]
+    lines = split_lines(answer)
     marked = [(row, col) for row, pieces in enumerate(lines) for col, piece in enumerate(pieces) if _MARKER.search(piece)]
     last = marked[-1] if marked else None              # bez značek v textu je server doplní na konec – kryjí vše
+    # odrážky pod uvedením se značkou („… má tyto výjimky [1]:“) značku nemívají – platí pro ně značka uvedení
+    listed = _listed_rows(lines)
+    if listed and last is not None:
+        last = max(last, max((row, len(lines[row]) - 1) for row in listed))
     out = []
     for row, pieces in enumerate(lines):
-        last_in_line = max((col for marked_row, col in marked if marked_row == row), default=-1)
+        last_in_line = len(pieces) if row in listed else max((col for marked_row, col in marked if marked_row == row), default=-1)
         kept = []
         for col, piece in enumerate(pieces):
             words = [word for word in tokenize(_MARKER.sub(" ", piece)) if word not in _COMMON]
@@ -99,13 +139,33 @@ def drop_unsupported(answer: str, cited_texts: list[str]) -> str:
     return re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip()
 
 
+_BULLET = re.compile(r"^\s*(?:[-–•*]|\d{1,2}[.)]|[a-z]\))\s+")         # odrážka, „1.“, „2)“ nebo „a)“
+
+
+def _listed_rows(lines: list[list[str]]) -> set[int]:
+    """Řádky výčtu, které stojí pod uvedením se značkou zdroje zakončeným dvojtečkou."""
+    rows: set[int] = set()
+    opened = False
+    for row, pieces in enumerate(lines):
+        if not pieces:
+            continue                                    # prázdný řádek výčet nepřerušuje
+        text = " ".join(pieces)
+        if opened and _BULLET.match(text):
+            rows.add(row)
+            continue
+        opened = bool(_MARKER.search(text)) and _MARKER.sub("", text).rstrip().endswith(":")
+    return rows
+
+
 def _grounding(answer: str, sources: str) -> float:
     """Podíl slov odpovědi, která jsou v citovaných úsecích (slova upravená stejně jako při hledání).
 
-    Slova z dotazu se záměrně nepočítají jako opora: jinak by šlo nechat si „potvrdit“ vlastní
-    větu („Je pravda, že…? Potvrď to.“) a chatbot by ji vydal s citací předpisu.
+    Počítají se jen slova, která nesou obsah: běžná slova („je“, „to“, „a“) jsou v každém předpisu a oporu
+    by nafukovala, čísla hlídá zvláštní kontrola. Slova z dotazu se záměrně nepočítají jako opora: jinak by
+    šlo nechat si „potvrdit“ vlastní větu („Je pravda, že…? Potvrď to.“) a chatbot by ji vydal s citací.
     """
     words = set(tokenize(_MARKER.sub(" ", answer)))
     if len(words) < MIN_WORDS:
         return 0.0
-    return len(words & set(tokenize(sources))) / len(words)
+    content = {word for word in words if word not in _COMMON and not any(ch.isdigit() for ch in word)} or words
+    return len(content & set(tokenize(sources))) / len(content)

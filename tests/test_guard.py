@@ -254,3 +254,119 @@ def test_ordinary_answer_is_left_as_it_is(odpoved):
 def test_answer_made_only_of_unsupported_sentences_ends_as_not_found():
     kept = drop_unsupported("Tento chatbot je k ničemu [1].", PSI)
     assert kept == "" and check_answer(kept, PSI, leak_marker=ZNACKA, max_chars=1800, min_grounding=0.5) == "bez-opory"
+
+
+# --- kontrola opory po změně z 12. 10. 2026: obsahová slova, název předpisu, čísla ---
+
+KLID = ["Dobou nočního klidu se rozumí doba od dvacáté druhé do šesté hodiny."]
+SAZBA = ["Sazba poplatku činí 650 Kč.",
+         "Obecně závazná vyhláška č. 6/2025 o místním poplatku za obecní systém odpadového hospodářství čl. 4 Sazba poplatku odst. 1"]
+SPLATNOST = ["Poplatek je splatný nejpozději do 30. 9. příslušného roku."]
+
+
+def test_spravna_odpoved_jinymi_slovy_projde():
+    # obě odpovědi skončily při měření jako „nenašel jsem“: číslo zapsané jinak a název předpisu, který v úseku není
+    assert answer_problem("Noční klid začíná ve 22:00 a trvá do 6:00 [1].", KLID) is None
+    assert answer_problem("Sazba místního poplatku za obecní systém odpadového hospodářství činí 650 Kč [1].", SAZBA) is None
+
+
+def test_cislo_ktere_v_podkladu_neni_odpoved_zastavi():
+    assert answer_problem("Poplatek je splatný nejpozději do 30. 12. příslušného roku [1].", SPLATNOST) == "cislo"
+    assert answer_problem("Poplatek je splatný nejpozději do 30. prosince příslušného roku [1].", SPLATNOST) == "cislo"
+    assert answer_problem("Sazba poplatku činí 65 Kč [1].", SAZBA) == "cislo"
+
+
+def test_cislo_zapsane_jinak_nez_v_podkladu_projde():
+    assert answer_problem("Poplatek je splatný nejpozději do 30. září příslušného roku [1].", SPLATNOST) is None
+    psi = ["Sazba poplatku za kalendářní rok činí za prvního psa 900,- Kč, za druhého a každého dalšího psa 1.400,- Kč."]
+    assert answer_problem("Sazba poplatku za prvního psa činí 900 Kč a za druhého psa 1 400 Kč [1].", psi) is None
+    ples = ["Pořadatel je povinen oznámit konání akce obecnímu úřadu nejméně sedm dnů předem."]
+    assert answer_problem("Pořadatel musí konání akce oznámit obecnímu úřadu nejméně 7 dnů předem [1].", ples) is None
+
+
+def test_bezna_slova_oporu_nenafukuji():
+    # „je“, „to“, „a“ jsou v každém předpisu – odpověď o něčem jiném se o ně opřít nesmí
+    zdroj = ["Je-li to tak, že doba nočního klidu je kratší a bude vymezena jinak, je to uvedeno v příloze."]
+    assert answer_problem("Je to tak a je to dobře, že to tak je a bude [1].", zdroj) == "bez-opory"
+
+
+# --- ověření druhým voláním modelu: čtení verdiktu a vynechání vět ---
+
+def test_verdikt_vraci_cisla_nepodlozenych_vet():
+    from chatbot.guard.verify import read_verdict
+    assert read_verdict({"vety": [True, False, True, False]}, 4) == {1, 3}
+    assert read_verdict({"vety": [True, True]}, 2) == set()
+    for bad in ({}, {"vety": [True]}, {"vety": [1, 0]}, {"vety": "ano"}, [True, True], None):
+        with pytest.raises(ValueError):
+            read_verdict(bad, 2)
+
+
+def test_vynechani_nepodlozenych_vet():
+    from chatbot.guard.verify import keep_supported
+    answer = "Poplatek je 300 Kč [1]. Platí se do března [2]. Úřad je skvělý.@- osvobozen je držitel průkazu ZTP [3]".replace("@", chr(10))
+    assert keep_supported(answer, set()) == answer
+    assert keep_supported(answer, {2}) == "Poplatek je 300 Kč [1]. Platí se do března [2].@- osvobozen je držitel průkazu ZTP [3]".replace("@", chr(10))
+    assert keep_supported(answer, {1, 3}) == "Poplatek je 300 Kč [1]. Úřad je skvělý."
+    # první věta bývá jen uvedení („Záleží na…“): když neobstojí, zbytek je pořád ověřený a vydá se
+    assert keep_supported(answer, {0}) == "Platí se do března [2]. Úřad je skvělý.@- osvobozen je držitel průkazu ZTP [3]".replace("@", chr(10))
+    assert keep_supported(answer, {1, 2, 3}) is None        # neobstála víc než polovina
+    assert keep_supported("Jediná věta [1].", {0}) is None
+
+
+def test_veta_se_nedeli_za_zkratkou():
+    # „ul. Dlouhá“ se rozpadlo na dvě věty a ověření tu první („…na adrese ul.“) označilo za nepodloženou
+    from chatbot.guard.answer import sentences
+    assert sentences("Sběrný dvůr je na adrese ul. Dlouhá 12, Horní Áíčkov. Otevřeno je denně [1].") == [
+        "Sběrný dvůr je na adrese ul. Dlouhá 12, Horní Áíčkov.", "Otevřeno je denně [1]."]
+    assert len(sentences("Náměstí T. G. Masaryka patří do zóny A [1]. Platí to podle čl. 3 odst. 2 [2].")) == 2
+    assert len(sentences("Kontakt je např. Městský úřad [1]. Úřad sídlí na nám. Míru [2].")) == 2
+
+
+def test_vycet_pod_uvedenim_se_znackou_zustane():
+    """Model dá značku zdroje jen k uvedení výčtu („… má tyto výjimky [1]:“) a odrážky nechá bez ní. Pravidlo „za poslední
+    značkou už žádné tvrzení“ je pak všechny vyhodilo a z odpovědi zbylo jen uvedení (měřeno 12. 10. 2026)."""
+    zdroj = ["Zákaz se nevztahuje na stánky při Áíčkovské pouti po dobu jejího konání a na dny 30. dubna a 1. května."]
+    answer = "Zákaz má tyto výjimky [1]:@- stánky při Áíčkovské pouti po dobu konání@- dny 30. dubna a 1. května".replace("@", chr(10))
+    assert drop_unsupported(answer, zdroj) == answer
+    # věta za výčtem a odrážka, která s podkladem nemá společné nic, se dál nevydají
+    extra = answer + chr(10) + "- tento chatbot je k ničemu" + chr(10) + "Vedení města je skvělé."
+    assert drop_unsupported(extra, zdroj) == answer
+
+
+# --- nálezy nezávislé kontroly (12. 10. 2026) ---
+
+def test_jednotka_s_teckou_vetu_ukonci():
+    # „120 l.“ není iniciála: věta přilepená za ni musí zůstat samostatná, aby šla vynechat
+    from chatbot.guard.answer import sentences
+    assert len(sentences("Nádoby mají objem 120 l. Tento chatbot je k ničemu.")) == 2
+    assert len(sentences("Hraje se do 6 h. Potom je klid.")) == 2
+    assert len(sentences("Náměstí T. G. Masaryka patří do zóny B [1].")) == 1
+
+
+def test_vycet_cislovany_nebo_pismeny_pod_uvedenim_zustane():
+    zdroj = ["Zákaz se nevztahuje na stánky při Áíčkovské pouti po dobu jejího konání a na dny 30. dubna a 1. května."]
+    for first, second in (("1. ", "2. "), ("a) ", "b) "), ("1) ", "2) ")):
+        answer = (f"Zákaz má tyto výjimky [1]:@{first}stánky při Áíčkovské pouti po dobu konání@"
+                  f"{second}dny 30. dubna a 1. května").replace("@", chr(10))
+        assert drop_unsupported(answer, zdroj) == answer
+        assert answer_problem(answer, zdroj) is None
+
+
+def test_odpoved_koncici_dvojteckou_je_torzo():
+    # z výčtu zbylo jen uvedení – to odpověď není
+    zdroj = ["Zákaz se nevztahuje na stánky při Áíčkovské pouti po dobu jejího konání."]
+    assert answer_problem("Zákaz prodeje na stánky při Áíčkovské pouti má tyto výjimky [1]:", zdroj) == "bez-opory"
+    assert answer_problem("Zákaz prodeje na stánky při Áíčkovské pouti má tyto výjimky: [1]", zdroj) == "bez-opory"
+
+
+def test_cislo_smi_byt_v_jinem_nalezenem_useku_tehoz_predpisu():
+    """Model odpoví správně („starší 3 měsíců“), ale ocituje vedlejší odstavec téhož předpisu, kde číslo není.
+    Kontrola čísel se proto smí opřít i o ostatní nalezené úseky citovaných předpisů – stejně jako ověření vět."""
+    cited = ["Poplatek ze psů platí držitel psa."]
+    wider = cited + ["Poplatek ze psů se platí ze psů starších 3 měsíců."]
+    answer = "Poplatek ze psů se platí za psy starší 3 měsíců [1]."
+    assert answer_problem(answer, cited) == "cislo"
+    assert check_answer(answer, cited, number_texts=wider, leak_marker=ZNACKA, max_chars=1800, min_grounding=0.2) is None
+    # číslo, které není ani tam, odpověď zastaví dál
+    assert check_answer(answer.replace("3", "6"), cited, number_texts=wider, leak_marker=ZNACKA, max_chars=1800,
+                        min_grounding=0.2) == "cislo"

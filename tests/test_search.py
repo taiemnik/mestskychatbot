@@ -104,3 +104,65 @@ def test_empty_query_returns_empty():
     assert Searcher(index).search("   ", unit(1, 0, 0)) == []
     assert LexicalIndex(TEXTS).search("", k=5) == []
     assert LexicalIndex([]).search("cokoli", k=5) == []
+
+
+def test_tokenize_unifies_adjective_forms():
+    # „noční“ a „nočního“ dávaly různé kusy: dotaz „noční klid“ nenašel „doba nočního klidu“ a kontrola opory
+    # zahodila správnou odpověď (měřeno 12. 10. 2026)
+    assert len(set(tokenize("noční nočního nočnímu nočním nočních"))) == 1
+    assert len(set(tokenize("veřejný veřejného veřejném veřejnou veřejných veřejnými veřejné"))) == 1
+    assert len(set(tokenize("odpad odpadu odpadový odpadového odpadovém odpadové"))) == 1
+    assert tokenize("slova") == ["slov"]                # krátký kmen se o „ova“ nekrátí
+
+
+def test_tokenize_unifies_irregular_nouns():
+    # „pes“ se skloňuje nepravidelně a v předpisech obcí je všude (poplatek ze psů, pohyb psů)
+    assert set(tokenize("pes psa psovi psů psům psy psem psech")) == {"pes"}
+    assert set(tokenize("dítě dítěte děti dětí dětem")) == {"dite"}
+
+
+def test_slouceni_poradi_s_vahou_da_prednost_vyznamu():
+    """Slovní hledání je na běžně položené otázky slabší než hledání podle významu (měřeno 12. 10. 2026) – při stejné
+    váze stahovalo správný úsek dolů. Váha říká, kolikrát víc platí místo v prvním pořadí."""
+    from chatbot.search.rank import rrf_merge
+
+    meaning, words = [(2, 0.9), (3, 0.8)], [(1, 9.0), (2, 8.0)]
+    equal = [item for item, _ in rrf_merge([meaning, words])]
+    assert equal[0] == 2 and equal.index(1) < equal.index(3)            # stejná váha: první podle slov před druhým podle významu
+    weighted = [item for item, _ in rrf_merge([meaning, words], [2.0, 1.0])]
+    assert weighted[0] == 2 and weighted.index(3) < weighted.index(1)
+
+
+def test_hledani_pouziva_vahu_vyznamu(monkeypatch):
+    from chatbot.search import hybrid
+
+    # úsek 0 je první podle slov a druhý podle významu, úsek 1 první podle významu a slovy se nenajde
+    index = make_index(["Poplatek ze psů platí držitel psa.", "Úhrada je splatná do 31. března."], [unit(0.2, 1), unit(1, 0.1)])
+    order = lambda: [hit.chunk.anchor for hit in Searcher(index).search("poplatek ze psů držitel", unit(1, 0), k=2)]
+    monkeypatch.setattr(hybrid, "MEANING_WEIGHT", 1.0)
+    assert order() == ["b0", "b1"]              # stejná váha: úsek nalezený oběma způsoby je první
+    monkeypatch.setattr(hybrid, "MEANING_WEIGHT", 100.0)
+    assert order() == ["b1", "b0"]              # velká váha významu pořadí otočí (od 63 při RRF_K = 60)
+
+
+def test_presny_odkaz_na_clanek_jde_do_vysledku_cely(monkeypatch):
+    """„Co říká čl. 4 vyhlášky 5/2030?“ – odstavce toho článku patří do podkladu všechny, i když je v pořadí
+    přeskočí kratší úseky (měřeno 12. 10. 2026: model dostal odstavec 2, odstavec 1 se sazbami ne)."""
+    def chunk(n, doc, article, paragraph, text):
+        return Chunk(id=f"{n}:b", doc_id=n, path=[doc, article, paragraph], label=f"{article}, {paragraph}", text=text, anchor="b")
+
+    dog, waste = "Vyhláška č. 5/2030 o poplatku ze psů", "Vyhláška č. 6/2030 o odpadu"
+    chunks = [chunk(0, dog, "čl. 4 Sazba poplatku", "odst. 1", "Sazba činí za prvního psa 250 Kč a za druhého a každého dalšího 1 400 Kč, " * 6),
+              chunk(1, dog, "čl. 4 Sazba poplatku", "odst. 2", "Poplatek se platí v poměrné výši."),
+              chunk(2, dog, "čl. 5 Splatnost", "odst. 1", "Poplatek je splatný do 31. března."),
+              chunk(3, waste, "čl. 4 Sazba poplatku", "odst. 1", "Sazba činí 650 Kč.")]
+    index = Index(manifest={}, docs={}, chunks=chunks, vectors=np.stack([unit(0, 1), unit(0.1, 1), unit(1, 0), unit(1, 0.1)]))
+    searcher = Searcher(index)
+    hits = searcher.search("co říká čl. 4 vyhlášky 5/2030", unit(1, 0), k=1)
+    assert {hit.chunk.id for hit in hits} >= {"0:b", "1:b"} and "3:b" not in {hit.chunk.id for hit in hits[1:]}
+    # samotné „čl. 4“ bez čísla předpisu sedí na víc předpisů; když je takových úseků moc, nepřidá se nic
+    from chatbot.search import hybrid
+    monkeypatch.setattr(hybrid, "EXACT_MAX", 2)
+    assert len(searcher.search("co říká čl. 4", unit(1, 0), k=1)) == 1
+    # dotaz bez odkazu se nemění
+    assert len(searcher.search("kolik stojí pes", unit(1, 0), k=1)) == 1

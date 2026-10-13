@@ -8,6 +8,9 @@ organizace = ""                 # například "Město Horní Áíčkov" – obje
 popis = "Odpovídám z obecně závazných vyhlášek a nařízení města a u každé odpovědi ukážu, kde přesně to v předpisu stojí."
 upozorneni = "Odpověď může obsahovat chyby. Závazné je vždy znění předpisu."
 kontakt = ""                    # kam se obrátit, když chatbot odpověď nezná (web, e-mail nebo telefon úřadu)
+# Co chatbot řekne, když odpověď v dokumentech není: z čeho odpovídá a kam jít jinam. Prázdné = obecná věta.
+# Například: "Odpovídám jen z vyhlášek a nařízení města. Úřední hodiny, kontakty a služby najdete na webu města."
+nenalezeno = ""
 odkaz = ""                      # adresa, kde jsou předpisy zveřejněné, například stránka obce ve Sbírce právních předpisů
 # Odkaz „Chcete takového chatbota?“ v postranním panelu. Smažte hodnotu, pokud ho na stránce nechcete.
 navod = "https://github.com/taiemnik/mestskychatbot"

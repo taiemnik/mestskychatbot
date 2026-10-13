@@ -160,7 +160,7 @@ def test_error_message_does_not_leak_key():
 
 def test_provider_from_settings():
     provider = provider_from_settings(Settings(llm_api_key="abc", embed_dim=256))
-    assert (provider.embed_model, provider.embed_dim) == ("text-embedding-3-small", 256)
+    assert (provider.embed_model, provider.embed_dim) == ("text-embedding-3-large", 256)
     assert provider.reasoning_effort == ""
     assert provider_from_settings(Settings.from_env({"LLM_API_KEY": "abc", "REASONING_EFFORT": "low"})).reasoning_effort == "low"
     with pytest.raises(LLMError, match="LLM_API_KEY"):

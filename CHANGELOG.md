@@ -1,5 +1,20 @@
 # Změny
 
+## 0.3.0 – 12. 10. 2026
+
+Kvalita odpovědí. Vychází z měření na sadě asi osmdesáti běžně položených otázek (dřív 27 otázek psaných slovy předpisu, které vycházely 27 z 27 a neřekly nic).
+
+- **Ověření odpovědi druhým voláním modelu** (`VERIFY_ANSWER`, výchozí zapnuto): hotová odpověď se rozdělí na věty a model u každé řekne, jestli to, co tvrdí, v úsecích citovaných předpisů stojí. Nepodložená věta se vynechá; když neobstojí víc než polovina vět nebo ověření selže, odpověď se nevydá. Dotaz je s ním asi o polovinu dražší (měřeno na levném modelu: 1,2 místo 0,83 haléře) a o vteřinu až dvě delší.
+- **Kontrola čísel**: číslo nebo měsíc v odpovědi, které v citovaných úsecích nejsou, odpověď zastaví (`odp-cislo`). Zápis nerozhoduje („22:00“ = „dvacátá druhá hodina“, „31. března“ = „31. 3.“, „1 400 Kč“ = „1.400,- Kč“).
+- **Změna chování – kontrola slov je jen spodní hranice.** `MIN_GROUNDING` je 0,2 místo 0,5, počítají se jen obsahová slova a za oporu platí i název předpisu a článku. Práh 0,5 zahazoval správné odpovědi řečené běžnými slovy a nepravdivou větu ze slov předpisu stejně pustil. Bez ověření (`VERIFY_ANSWER=0`) ho vraťte na 0,5.
+- **Krácení slov** spojuje tvary přídavných jmen („noční“ × „nočního“) a pár nepravidelných slov („pes“ × „psů“) – pro hledání i pro kontrolu odpovědi. Věty se nedělí za zkratkou („ul. Dlouhá“).
+- **Novely**: cituje-li se předpis změněný novelou, která je v indexu, jdou její úseky do podkladu. Z ustanovení, které novela výslovně zrušila, chatbot neodpoví a řekne proč (`odp-zruseno`).
+- **Upozornění k předpisu píše server**, ne model: novela, zrušení, budoucí účinnost.
+- **Když odpověď v dokumentech není**, říká chatbot, z čeho odpovídá; vlastní větu nastavíte v `chatbot.toml` (`nenalezeno`). Dřív radil „zkuste dotaz přeformulovat“ i na „kdo je starosta“.
+- **Zadání pro model** počítá s běžnou řečí („popelnice“ = poplatek za odpad) a s otázkou, jejíž odpověď závisí na okolnostech (vyjmenuje možnosti, neodmítne).
+- **Hledání**: výchozí embeddingy jsou `text-embedding-3-large` s rozměrem 1024 (**sestavte index znovu**, jinak aplikace ohlásí, že index nesedí); dotaz s odkazem na článek („čl. 4 vyhlášky 5/2025“) dostane do podkladu celý článek.
+- **Zkušební otázky** (`python tasks.py check`): typy otázek, údaje, které v odpovědi musí být (`fakta`), víc správných odstavců, otázky mimo dokumenty a na zrušená ustanovení. Výsledek po vrstvách – nalezeno, citováno, správně zodpovězeno, mimo dokumenty bez odpovědi – a u každé otázky, která nevyšla, proč. Nové prahy: 80 % správně, 90 % mimo dokumenty. `check --hledani` ukáže pořadí správného odstavce podle slov, podle významu a po sloučení. Starý tvar řádku platí dál.
+
 ## 0.2.0 – 12. 10. 2026
 
 - Repo je nezávislé na hostingu. Kde chatbot poběží, si každý řeší sám: `docs/nasazeni.md` říká, co k běhu potřebuje, co se nasazuje a na co si dát pozor. Soubory a postup pro jeden konkrétní hosting v repu nejsou. Aplikace je `chatbot.api.app:app` a stránku z `public/` podává vždy sama.

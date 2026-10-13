@@ -3,7 +3,7 @@
   sbirka    stáhne platné vyhlášky a nařízení obce ze Sbírky právních předpisů do složky dokumenty/
   build     z dokumentů sestaví index (databázi chatbota) a vypíše, co se změnilo
   serve     spustí chatbota na tomto počítači nebo serveru (http://localhost:8770)
-  check     zkušební otázky (správný odstavec nalezen / citován); s --utoky sada pokusů o zneužití
+  check     zkušební otázky (nalezeno / citováno / správně zodpovězeno); --hledani pořadí po vrstvách, --utoky sada útoků
   kontrola  co zkontrolovat, než chatbot půjde na internet (tajemství, osobní údaje, stav indexu)
 """
 from __future__ import annotations
@@ -139,8 +139,9 @@ def _port_is_free(host: str, port: int) -> bool:
 
 def cmd_check(args: argparse.Namespace) -> int:
     """Zkušební otázky (a s --utoky sada útoků) proti místní aplikaci nebo proti nasazené adrese."""
-    from chatbot.evalcheck import (WITHOUT_MODEL, WITHOUT_MODEL_ATTACKS, format_attacks, format_check, local_ask, passed,
-                                   remote_ask, run_attacks, run_check)
+    from chatbot.evalcheck import (WITHOUT_MODEL, WITHOUT_MODEL_ATTACKS, format_attacks, format_check, format_retrieval,
+                                   load_jsonl, local_ask, local_parts, passed, remote_ask, run_attacks, run_check,
+                                   run_retrieval)
     from chatbot.index.store import IndexMismatchError
     from chatbot.llm.provider import LLMError
 
@@ -150,6 +151,19 @@ def cmd_check(args: argparse.Namespace) -> int:
         return 2
     settings = Settings.from_env()
     without_model = not args.url and not settings.llm_api_key
+    if args.hledani:
+        if args.url or args.utoky:
+            print("Pořadí po vrstvách (--hledani) jde změřit jen místně nad zkušebními otázkami – bez --url a bez --utoky.")
+            return 2
+        try:
+            print(format_retrieval(run_retrieval(load_jsonl(path), *local_parts(settings), settings)))
+        except (LLMError, IndexMismatchError, RuntimeError, ValueError) as exc:
+            print(exc)
+            return 2
+        if without_model:
+            print()
+            print("Klíč k modelu není nastavený – nad ostrým indexem se bez něj hledá jen podle slov.")
+        return 0
     try:
         ask = remote_ask(args.url) if args.url else local_ask(settings)
         if args.utoky:
@@ -164,10 +178,10 @@ def cmd_check(args: argparse.Namespace) -> int:
         if without_model:
             print("\n" + WITHOUT_MODEL_ATTACKS)
         return 0 if attacks.ok else 1
-    print(format_check(result))
+    print(format_check(result, answers=not without_model))
     if without_model:
         print("\n" + WITHOUT_MODEL)
-    return 0 if passed(result) else 1
+    return 0 if passed(result, answers=not without_model) else 1
 
 
 def cmd_kontrola(args: argparse.Namespace) -> int:
@@ -203,6 +217,8 @@ def main(argv: list[str] | None = None) -> int:
     check.add_argument("--url", help="adresa nasazeného chatbota (bez ní se ptá přímo v procesu)")
     check.add_argument("--utoky", action="store_true", help="místo zkušebních otázek pustit sadu útoků (eval/utoky.jsonl)")
     check.add_argument("--sada", default="otazky.jsonl", help="soubor se sadou ve složce eval/")
+    check.add_argument("--hledani", action="store_true",
+                       help="místo odpovědí změřit jen hledání: na kolikátém místě je správný odstavec podle slov, významu a po sloučení")
     check.set_defaults(func=cmd_check)
 
     kontrola = sub.add_parser("kontrola", help="kontrola před zveřejněním")

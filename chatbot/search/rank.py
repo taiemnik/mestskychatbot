@@ -16,10 +16,11 @@ def top_k(scores: np.ndarray, k: int, positive_only: bool = False) -> list[tuple
     return [(i, float(scores[i])) for i in ordered if not positive_only or scores[i] > 0]
 
 
-def rrf_merge(rankings: list[list[tuple[int, float]]]) -> list[tuple[int, float]]:
-    """Sloučí několik pořadí: položka dostane za každé pořadí 1 / (RRF_K + místo). Skóre způsobů se nemíchají."""
+def rrf_merge(rankings: list[list[tuple[int, float]]], weights: list[float] | None = None) -> list[tuple[int, float]]:
+    """Sloučí několik pořadí: položka dostane za každé pořadí váha / (RRF_K + místo). Skóre způsobů se nemíchají.
+    `weights` říká, kolikrát víc platí místo v daném pořadí (bez nich platí všechna stejně)."""
     merged: dict[int, float] = {}
-    for ranking in rankings:
+    for ranking, weight in zip(rankings, weights or [1.0] * len(rankings)):
         for place, (item, _) in enumerate(ranking, start=1):
-            merged[item] = merged.get(item, 0.0) + 1.0 / (RRF_K + place)
+            merged[item] = merged.get(item, 0.0) + weight / (RRF_K + place)
     return sorted(merged.items(), key=lambda pair: (-pair[1], pair[0]))
