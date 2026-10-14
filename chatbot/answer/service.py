@@ -5,7 +5,7 @@ Co se vydá, rozhoduje server, ne model:
   - když hledání nic podobného nenajde, model se nevolá („nenašel jsem“);
   - odpověď modelu se vydá jen s platnými citacemi nalezených úseků a po kontrole obsahu (slova, čísla);
   - hotovou odpověď ověří druhé volání modelu větu po větě proti úsekům citovaných předpisů: nepodložená věta se
-    vynechá, a když neobstojí víc než polovina vět, nezbude věta se zdrojem nebo ověření selže, nevydá se nic;
+    vynechá, a když neobstojí víc než polovina vět nebo ověření selže, nevydá se nic;
   - při „nenašel jsem“ se text modelu nikdy nevydává – jen pevná věta a nejbližší úseky;
   - žádost o názor nebo osobní rozhodnutí model jen označí (`nazor`); větu, že od názorů chatbot není, píše server;
   - když se cituje předpis změněný novelou, dostane model do podkladu i úseky novely; z ustanovení, které
@@ -216,10 +216,15 @@ def _verified(question: str, text: str, citations: list[int], grounds: list[str]
     if not unsupported:
         return text, citations
     text = keep_supported(text, unsupported)
-    # zdroj, o který se opírala jen vynechaná věta, už zdrojem odpovědi není – a odpověď, které nezbyl žádný
-    # zdroj (z ověřené odpovědi zůstalo jen uvedení), se nevydá
-    citations = [n for n in citations if text and f"[{n}]" in text]
-    if not text or not citations or check_answer(text, grounds, **checks):
+    if not text:
+        raise _Withheld(found.miss("odp-neoverena"))
+    # Zdroj, o který se opírala jen vynechaná věta, už zdrojem odpovědi není. Když ale ve zbylém textu žádná značka
+    # není – model je napsal až za poslední větu, nebo vůbec –, zůstávají zdroje, jak je model uvedl: každá zbylá
+    # věta je ověřená proti úsekům právě těchto předpisů. Do 13. 10. 2026 se taková odpověď nevydala a v měření tak
+    # padaly správné odpovědi (první věta odpověděla, kontrolor vynechal až dovětek, za kterým byly značky). Cena:
+    # občas zbude jen věta, která říká, o čem ustanovení je – je pravdivá a zdroj u ní je (docs/ochrana.md, Meze).
+    citations = [n for n in citations if f"[{n}]" in text] or citations
+    if check_answer(text, grounds, **checks):
         raise _Withheld(found.miss("odp-neoverena"))
     return text, citations
 

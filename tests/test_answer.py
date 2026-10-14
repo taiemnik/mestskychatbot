@@ -480,14 +480,17 @@ def test_zruseni_odstavce_nebo_slov_neni_zruseni_clanku():
     assert chunk_part("čl. 3a, odst. 2") == (None, None)            # článek 3a není článek 3
 
 
-def test_po_overeni_nezustane_odpoved_bez_zdroje(index, searcher):
-    """Kontrolor odmítne jedinou větu se značkou zdroje: zbylé uvedení bez zdroje se nevydá (a už vůbec ne se značkou
-    vynechané věty)."""
+@pytest.mark.parametrize("marker", [" [1]", ""])
+def test_po_overeni_si_veta_bez_znacky_necha_zdroje_odpovedi(index, searcher, marker):
+    """Model někdy napíše značky zdrojů jen za poslední větu, nebo je do textu nenapíše vůbec. Když kontrolor vynechá
+    právě tu poslední větu, zbytek je ověřený a vydá se – se zdroji, jak je model uvedl. Do 13. 10. 2026 se v takovém
+    případě nevydalo nic a v měření tak padaly správné odpovědi (první věta odpověděla, vynechal se jen dovětek)."""
     hits = hits_for(index, searcher)
     lead = " ".join(hits[0].chunk.text.split()[:5]).rstrip(":,;") + "."
-    fact = grounded(hits[0], 1)
+    fact = " ".join(hits[0].chunk.text.split()[:14]) + f"{marker}."
     script = [{"found": True, "answer": f"{lead} {fact}", "citations": [1]},
               {"vety": [True] * len(sentences(lead)) + [False] * len(sentences(fact))}]
     assert len(sentences(lead)) >= len(sentences(fact))             # jinak by odpověď padla už na „víc než polovina“
     answer, _ = ask(index, searcher, script, settings=VERIFY)
-    assert not answer.found and answer.blocked == "odp-neoverena"
+    assert answer.found and answer.blocked is None and answer.answer == f"{lead} [1]"
+    assert [source.anchor for source in answer.sources] == [hits[0].chunk.anchor]

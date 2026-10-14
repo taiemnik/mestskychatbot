@@ -1,5 +1,9 @@
 # Změny
 
+## 0.3.1 – 13. 10. 2026
+
+- **Změna chování – ověřená odpověď bez značky zdroje se vydá.** Když kontrolor vynechal větu, za kterou model napsal značky zdrojů, a ve zbylém textu žádná značka nezbyla, odpověď se dosud nevydala. Padaly tím správné odpovědi: model někdy píše značky až za poslední větu, nebo je do textu nenapíše vůbec – první věta odpověděla, kontrolor vynechal jen dovětek a odpověď padla celá. Teď se zbylé ověřené věty vydají se zdroji, jak je model uvedl. Na sadě 84 otázek to v každém běhu vrátilo jednu správnou odpověď; celkový výsledek se v rozptylu běhů neposunul. Cena: po ověření může zbýt jen věta, která říká, o čem ustanovení je (`docs/ochrana.md`, Meze – „Po ověření může zbýt torzo“).
+
 ## 0.3.0 – 12. 10. 2026
 
 Kvalita odpovědí. Vychází z měření na sadě asi osmdesáti běžně položených otázek (dřív 27 otázek psaných slovy předpisu, které vycházely 27 z 27 a neřekly nic).
